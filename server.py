@@ -1,5 +1,5 @@
 import socket, select, sys
- 
+
 if __name__ == '__main__':
 	 
 	if len(sys.argv) != 2:
@@ -72,13 +72,12 @@ if __name__ == '__main__':
 					for send_socket in CONNECTION_LIST:
 						if send_socket is not server_socket:
 							try :
-								send_socket.send(bytes('\r' + '<' + str(sock.getpeername()) + '> ' + data, 'UTF-8'))
+								send_socket.send(bytes('Client (%s, %s) is offline' % addr, 'UTF-8'))
 							except :
 								# broken socket connection may be, chat client pressed ctrl+c for example
 								send_socket.close()
 								CONNECTION_LIST.remove(send_socket)
 
-					broadcast_data(sock, 'Client (%s, %s) is offline' % addr)
 					continue
 	 
 	server_socket.close()
