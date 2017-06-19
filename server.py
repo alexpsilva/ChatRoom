@@ -20,6 +20,7 @@ class ChatServer():
 		self.outputs = []
 
 		self.message_queues = {}
+		self.usernames = {}
 
 		print('Chat server started on port ' + str(port))
 
@@ -37,9 +38,11 @@ class ChatServer():
 		if sock in self.outputs:
 			self.outputs.remove(sock)
 		self.inputs.remove(sock)
+		sock.shutdown(socket.SHUT_RDWR)
 		sock.close()
 
 		del self.message_queues[sock]
+		del self.usernames[sock]
 
 	def run(self):
 		while 1:
@@ -54,25 +57,30 @@ class ChatServer():
 
 					self.inputs.append(new_socket)
 					self.message_queues[new_socket] = queue.Queue()
+					self.usernames[new_socket] = str(new_addr)
 
-					self.broadcast('<(%s, %s)> entered the room' % new_addr)			 
+					self.broadcast('<' + self.usernames[new_socket] + '> entered the room')			 
 				else:
 					# Message sent from a client
 					try:
 						data = sock.recv(self.buffer_size).decode('UTF-8')					 
 					except socket.error:
 						sock_addr = str(sock.getpeername())
+						self.broadcast('<' + self.usernames[sock] + '> ' + 'has left the room')
 						self.remove(sock)
-						self.broadcast('<' + sock_addr + '> ' + 'has left the room')
 					else:
 						if data:
 							# Valid message received from the client
-							self.broadcast('<' + str(sock.getpeername()) + '> ' + data)
+							if r'\username=' in data:
+								# Set this client's username to whatever is after '\username=' in the message
+								self.usernames[sock] = data[10:] 
+							else:
+								self.broadcast('<' + self.usernames[sock] + '> ' + data)
 						else:
 							# Received a blank message, therefore, the client has closed the socket
 							sock_addr = str(sock.getpeername())
+							self.broadcast('<' + self.usernames[sock] + '> ' + 'has left the room')
 							self.remove(sock)
-							self.broadcast('<' + sock_addr + '> ' + 'has left the room')
 
 			for sock in write_sockets:
 				while not self.message_queues[sock].empty():
@@ -82,8 +90,8 @@ class ChatServer():
 
 			for sock in error_sockets:
 				sock_addr = str(sock.getpeername())
+				self.broadcast('<' + self.usernames[sock] + '> ' + 'has left the room')
 				self.remove(sock)
-				self.broadcast('<' + sock_addr + '> ' + 'has left the room')
 
 #End of 'ChatServer' definition
 

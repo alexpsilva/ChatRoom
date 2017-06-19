@@ -27,11 +27,11 @@ class ChatClient(threading.Thread):
 			self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		except socket.error:
 			print('Failed to create socket')
-			#(to-do) evaluate if it is correct to 'sys.exit()'
-			sys.exit()
+			self.close()
 
 	def stop(self):
 		self.client_socket.close()
+		root.quit()
 		self._stop_event.set()
 
 	def stopped(self):
@@ -80,17 +80,16 @@ class ChatClient(threading.Thread):
 				while not self.output_queue.empty():
 					msg = self.output_queue.get_nowait()
 
+					self.sendMsg(msg)
 					if(msg == ''):
 						self.stop()
-					else:
-						sock.send(bytes(msg, 'UTF-8'))
 
 #End of 'ChatClient' definition
 
 socket_thread = ChatClient(sys.argv[1], sys.argv[2], output_queue, output_lock)
 socket_thread.start()
 
-root.geometry("400x400+300+300")
+root.geometry("400x410+300+200")
 root.mainloop()
 
 socket_thread.join()
