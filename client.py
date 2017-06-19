@@ -1,14 +1,27 @@
 import socket, select, string, sys, queue
 
-from threading import *
-from tkinter import *
+from chat_window import *
 
-class ChatClient(Thread):
-	def __init__(self, host, port):
-		Thread.__init__(self)
+if(len(sys.argv) !=	 3) :
+	print('Invalid number of arguments')
+	sys.exit()
+
+output_queue = queue.Queue()
+output_lock = threading.Lock()
+
+root = Tk()
+chat = ChatWindow(root, output_queue, output_lock)
+chat.pack(side=TOP, fill=BOTH, expand=True)
+
+class ChatClient(threading.Thread):
+	def __init__(self, host, port, output_q, output_l):
+		threading.Thread.__init__(self)
 		self.host = host
 		self.port = int(port)
-		self.output_queue = queue.Queue()
+		self.output_queue = output_q
+		self.output_lock = output_l
+
+		self._stop_event = threading.Event()
 
 		try:
 			self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -16,6 +29,13 @@ class ChatClient(Thread):
 			print('Failed to create socket')
 			#(to-do) evaluate if it is correct to 'sys.exit()'
 			sys.exit()
+
+	def stop(self):
+		self.client_socket.close()
+		self._stop_event.set()
+
+	def stopped(self):
+		return self._stop_event.is_set()
 
 	def sendMsg(self, msg):
 		data = bytes(msg, 'UTF-8')
@@ -26,65 +46,53 @@ class ChatClient(Thread):
 			self.client_socket.connect((self.host, self.port))
 		except socket.error:
 			print('Unable to connect to (' + str(self.host) + ',' + str(self.port) + ')')
-			return
+			self.stop()
 
 		print('Connection successfull')
 
 		#(to-do) evaluate if there is no better condition other than 'while 1'
 		while 1:
-			socket_list = [sys.stdin, self.client_socket]
-			
 			# Get the list sockets which are readable
-			read_sockets, write_sockets, error_sockets = select.select(socket_list , [self.client_socket], [])
+			read_sockets, write_sockets, error_sockets = select.select([self.client_socket] , [self.client_socket], [])
 			
 			for sock in read_sockets:
 
-				if sock is self.client_socket:
-					# Receive message from the server
-					try:
-						data = sock.recv(4096).decode('UTF-8')
-					except socket.error:
-						print('Could not reach server')
-						sock.close()
-						return
+				# Receive message from the server
+				try:
+					data = sock.recv(4096).decode('UTF-8')
+				except socket.error:
+					print('Could not reach server')
+					sock.close()
+					self.stop()
 
-					if not data :
-						# Received a blank message, therefore, the server is down
-						print('Disconnected from server')
-						sock.close()
-						return
-					else :
-						# Valid message received
+				if not data :
+					# Received a blank message, therefore, the server is down
+					print('Disconnected from server')
+					sock.close()
+					self.stop()
+				else :
+					# Valid message received
 
-						# (to-do) Add msg to chat window here
-
-						sys.stdout.write(data)				 
-						sys.stdout.flush()
-				else:
-					# Send input from the user
-					msg = sys.stdin.readline()
-
-					if msg == '\n' :
-						#(to-do) remove this and make a better logic for closing a connection
-						sock.close()
-						return
-					else:
-						self.output_queue.put(msg)
+					global chat
+					chat.add_msg(data)						
 
 			for sock in write_sockets:
 				while not self.output_queue.empty():
 					msg = self.output_queue.get_nowait()
-					sock.send(bytes(msg, 'UTF-8'))
+
+					if(msg == ''):
+						self.stop()
+					else:
+						sock.send(bytes(msg, 'UTF-8'))
 
 #End of 'ChatClient' definition
 
-def main():
-	if(len(sys.argv) !=	 3) :
-		print('Invalid number of arguments')
-		sys.exit()
+socket_thread = ChatClient(sys.argv[1], sys.argv[2], output_queue, output_lock)
+socket_thread.start()
 
-	client = ChatClient(sys.argv[1], sys.argv[2])
-	client.run()
+root.geometry("400x400+300+300")
+root.mainloop()
 
-if __name__ == "__main__":
-	main()
+socket_thread.join()
+
+#(to-do) make a better logic to close the window and connection
