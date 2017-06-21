@@ -21,6 +21,7 @@ class ChatServer():
 
 		self.message_queues = {}
 		self.usernames = {}
+		self.passwords = {}
 
 		print('Chat server started on port ' + str(port))
 
@@ -28,11 +29,14 @@ class ChatServer():
 		#(to-do) remove this print
 		print(msg)
 		for send_socket in self.inputs:
-			if send_socket is not self.server_socket:
-				self.message_queues[send_socket].put(msg)
+			self.send_msg(send_socket, msg)
+		
+	def send_msg(self, send_socket, msg):
+		if send_socket is not self.server_socket:
+			self.message_queues[send_socket].put(msg)
 
-				if send_socket not in self.outputs:
-					self.outputs.append(send_socket)
+			if send_socket not in self.outputs:
+				self.outputs.append(send_socket)
 
 	def remove(self, sock):
 		if sock in self.outputs:
@@ -57,9 +61,7 @@ class ChatServer():
 
 					self.inputs.append(new_socket)
 					self.message_queues[new_socket] = queue.Queue()
-					self.usernames[new_socket] = str(new_addr)
-
-					self.broadcast('<' + self.usernames[new_socket] + '> entered the room')			 
+					self.usernames[new_socket] = str(new_addr)	 
 				else:
 					# Message sent from a client
 					try:
@@ -74,6 +76,30 @@ class ChatServer():
 							if r'\username=' in data:
 								# Set this client's username to whatever is after '\username=' in the message
 								self.usernames[sock] = data[10:] 
+							elif r'\login=' in data:
+								comma = data.find(',')
+								username = data[7:comma]
+								password = data[comma+1:]
+								if username in self.passwords:
+									if self.passwords[username] == password:
+										self.usernames[sock] = username
+
+										self.send_msg(sock, r'\accept_login')
+										self.broadcast('<' + self.usernames[sock] + '> entered the room')		
+									else:
+										self.send_msg(sock, r'\invalid_login_password')
+								else:
+									self.send_msg(sock, r'\invalid_login_username')
+
+							elif r'\register=' in data:
+								comma = data.find(',')
+								username = data[10:comma]
+								password = data[comma+1:]
+								if username in self.passwords:
+									self.send_msg(sock, r'\invalid_register_username')
+								else:
+									self.passwords[username] = password
+									self.send_msg(sock, r'\accept_register')
 							else:
 								self.broadcast('<' + self.usernames[sock] + '> ' + data)
 						else:

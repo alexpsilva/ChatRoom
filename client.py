@@ -1,6 +1,6 @@
 import socket, select, string, sys, queue
 
-from chat_window import *
+from top_level import *
 
 if(len(sys.argv) !=	 3) :
 	print('Invalid number of arguments')
@@ -9,9 +9,7 @@ if(len(sys.argv) !=	 3) :
 output_queue = queue.Queue()
 output_lock = threading.Lock()
 
-root = Tk()
-chat = ChatWindow(root, output_queue, output_lock)
-chat.pack(side=TOP, fill=BOTH, expand=True)
+root = TopLevel(output_queue, output_lock)
 
 class ChatClient(threading.Thread):
 	def __init__(self, host, port, output_q, output_l):
@@ -73,8 +71,8 @@ class ChatClient(threading.Thread):
 				else :
 					# Valid message received
 
-					global chat
-					chat.add_msg(data)						
+					global root
+					root.recv_msg(data)						
 
 			for sock in write_sockets:
 				while not self.output_queue.empty():
