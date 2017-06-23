@@ -122,7 +122,11 @@ class ChatServer():
 #End of 'ChatServer' definition
 
 def main():
-	server = ChatServer(5000)
+	if(len(sys.argv) !=	 2) :
+		print('Invalid number of arguments')
+		sys.exit()
+
+	server = ChatServer(int(sys.argv[1]))
 	server.run()
 
 if __name__ == "__main__":
