@@ -1,4 +1,4 @@
-import socket, select, sys, queue
+import socket, select, sys, queue, hashlib
 
 class ChatServer():
 	def __init__(self, port):
@@ -81,7 +81,7 @@ class ChatServer():
 								username = data[7:comma]
 								password = data[comma+1:]
 								if username in self.passwords:
-									if self.passwords[username] == password:
+									if self.passwords[username] == hashlib.sha256(bytes(password, 'UTF-8')).hexdigest():
 										self.usernames[sock] = username
 
 										self.send_msg(sock, r'\accept_login')
@@ -98,7 +98,7 @@ class ChatServer():
 								if username in self.passwords:
 									self.send_msg(sock, r'\invalid_register_username')
 								else:
-									self.passwords[username] = password
+									self.passwords[username] = hashlib.sha256(bytes(password, 'UTF-8')).hexdigest()
 									self.send_msg(sock, r'\accept_register')
 							else:
 								self.broadcast('<' + self.usernames[sock] + '> ' + data)
